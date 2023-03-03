@@ -1,7 +1,7 @@
-from django.contrib.auth import get_user_model
-from django.test import TestCase, Client
-
 from http import HTTPStatus
+
+from django.contrib.auth import get_user_model
+from django.test import Client, TestCase
 
 from ..models import Group, Post
 
@@ -24,14 +24,12 @@ class PostUrlTest(TestCase):
         )
 
     def setUp(self):
-        # Создаем неавторизованный клиент
         self.guest_client = Client()
-        # Создаем второй клиент
         self.authorized_client = Client()
-        # Авторизуем пользователя
         self.authorized_client.force_login(self.user)
 
     def test_url_exists_at_desired_location(self):
+        """Проверяет доступность URL-адреса."""
         adresses_status_codes = {
             '/': HTTPStatus.OK,
             f'/group/{self.group.slug}/': HTTPStatus.OK,
@@ -47,9 +45,12 @@ class PostUrlTest(TestCase):
                 self.assertEqual(response.status_code, status_code)
 
     def test_url_redirect_anonymous(self):
+        """Проверяет, что страница по URL-адресу перенаправит анонимного
+        пользователя на страницу логина."""
         adresses_redirrect = {
             '/create/': '/auth/login/?next=/create/',
-            f'/posts/{self.post.id}/edit/': f'/auth/login/?next=/posts/{self.post.id}/edit/',
+            f'/posts/{self.post.id}/edit/':
+                f'/auth/login/?next=/posts/{self.post.id}/edit/',
         }
         for adress, redirrect in adresses_redirrect.items():
             with self.subTest(adress=adress):
@@ -57,6 +58,7 @@ class PostUrlTest(TestCase):
                 self.assertRedirects(response, redirrect)
 
     def test_urls_uses_correct_template(self):
+        """Проверяет, что URL-адрес использует соответствующий шаблон."""
         url_names_templates = {
             '/': 'posts/index.html',
             f'/group/{self.group.slug}/': 'posts/group_list.html',

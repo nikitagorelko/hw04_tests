@@ -11,6 +11,7 @@ class CreationFormTests(TestCase):
         User.objects.create_user(username='auth')
 
     def test_sign_up(self):
+        """Проверят, что валидная форма создает нового пользователя."""
         users_count = User.objects.count()
         form_data = {
             'first_name': 'Test',
@@ -21,9 +22,6 @@ class CreationFormTests(TestCase):
             'password2': 'testpassword',
         }
         self.guest_client.post(
-            reverse('users:signup'),
-            data=form_data,
-            follow=True
+            reverse('users:signup'), data=form_data, follow=True
         )
         self.assertEqual(User.objects.count(), users_count + 1)
-

@@ -1,7 +1,7 @@
-from django.contrib.auth import get_user_model
-from django.test import TestCase, Client
-from django.urls import reverse
 from django import forms
+from django.contrib.auth import get_user_model
+from django.test import Client, TestCase
+from django.urls import reverse
 from yatube.settings import NOTES_NUMBER
 
 from ..models import Group, Post
@@ -26,14 +26,12 @@ class PostUrlTest(TestCase):
         )
 
     def setUp(self):
-        # Создаем неавторизованный клиент
         self.guest_client = Client()
-        # Создаем второй клиент
         self.authorized_client = Client()
-        # Авторизуем пользователя
         self.authorized_client.force_login(self.user)
 
     def test_pages_uses_correct_template(self):
+        """Проверяет, что view-функция использует соответствующий шаблон."""
         pages_names_templates = {
             reverse('posts:index'): 'posts/index.html',
             (
@@ -58,6 +56,7 @@ class PostUrlTest(TestCase):
                 self.assertTemplateUsed(response, template)
 
     def test_page_show_correct_recors_count(self):
+        """Проверяет паджинатор на странице."""
         for i in range(13):
             Post.objects.create(
                 author=self.user,
@@ -72,29 +71,52 @@ class PostUrlTest(TestCase):
         for page in pages:
             with self.subTest(page=page):
                 response = self.authorized_client.get(page)
-                self.assertEqual(len(response.context['page_obj']), NOTES_NUMBER)
+                self.assertEqual(
+                    len(response.context['page_obj']), NOTES_NUMBER
+                )
 
     def test_index_page_show_correct_context(self):
+        """Проверяет, что шаблон index сформирован с правильным контекстом."""
         response = self.guest_client.get(reverse("posts:index"))
         expected = list(Post.objects.all()[:NOTES_NUMBER])
-        self.assertEqual(response.context.get('page_obj').object_list, expected)
+        self.assertEqual(
+            response.context.get('page_obj').object_list, expected
+        )
 
     def test_group_list_page_show_correct_context(self):
-        response = self.authorized_client.get(reverse('posts:group_list', kwargs={'slug': self.group.slug}))
+        """Проверяет, что шаблон group_list сформирован
+        с правильным контекстом."""
+        response = self.authorized_client.get(
+            reverse('posts:group_list', kwargs={'slug': self.group.slug})
+        )
         expected = list(Post.objects.filter(group=self.group)[:NOTES_NUMBER])
-        self.assertEqual(response.context.get('page_obj').object_list, expected)
+        self.assertEqual(
+            response.context.get('page_obj').object_list, expected
+        )
 
     def test_profile_page_show_correct_context(self):
-        response = self.authorized_client.get(reverse('posts:profile', kwargs={'username': self.user.username}))
+        """Проверяет, что шаблон profile сформирован
+        с правильным контекстом."""
+        response = self.authorized_client.get(
+            reverse('posts:profile', kwargs={'username': self.user.username})
+        )
         expected = list(Post.objects.filter(author=self.user)[:NOTES_NUMBER])
-        self.assertEqual(response.context.get('page_obj').object_list, expected)
+        self.assertEqual(
+            response.context.get('page_obj').object_list, expected
+        )
 
     def test_post_detail_page_show_correct_context(self):
-        response = self.authorized_client.get(reverse('posts:post_detail', kwargs={'post_id': self.post.id}))
+        """Проверяет, что шаблон post_detail сформирован
+        с правильным контекстом."""
+        response = self.authorized_client.get(
+            reverse('posts:post_detail', kwargs={'post_id': self.post.id})
+        )
         expected = Post.objects.get(id=self.post.id)
         self.assertEqual(response.context.get('post'), expected)
 
     def test_post_create_page_show_correct_context(self):
+        """Проверяет, что шаблон post_create сформирован
+        с правильным контекстом."""
         response = self.authorized_client.get(reverse('posts:post_create'))
         form_fields = {
             'text': forms.fields.CharField,
@@ -106,7 +128,11 @@ class PostUrlTest(TestCase):
                 self.assertIsInstance(form_field, expected)
 
     def test_post_edit_page_show_correct_context(self):
-        response = self.authorized_client.get(reverse('posts:post_edit', kwargs={'post_id': self.post.id}))
+        """Проверяет, что шаблон post_edit сформирован
+        с правильным контекстом."""
+        response = self.authorized_client.get(
+            reverse('posts:post_edit', kwargs={'post_id': self.post.id})
+        )
         form_fields = {
             "text": forms.fields.CharField,
             "group": forms.models.ModelChoiceField,
@@ -117,6 +143,8 @@ class PostUrlTest(TestCase):
                 self.assertIsInstance(form_field, expected)
 
     def test_post_is_on_pages_if_has_group(self):
+        """Проверяет, что если при создании поста указать группу,
+        то этот пост появляется на странице"""
         pages_objects = {
             reverse('posts:index'): Post.objects.get(group=self.post.group),
             (
@@ -134,10 +162,14 @@ class PostUrlTest(TestCase):
                 self.assertIn(object, response.context.get('page_obj'))
 
     def test_post_is_not_on_another_group_page(self):
+        """Проверяет, что пост не попал в группу,
+        для которой не был предназначен."""
         Group.objects.create(
             title='Тестовая группа2',
             slug='test-slug2',
             description='Тестовое описание2',
         )
-        response = self.authorized_client.get(reverse('posts:group_list', kwargs={'slug': 'test-slug2'}))
+        response = self.authorized_client.get(
+            reverse('posts:group_list', kwargs={'slug': 'test-slug2'})
+        )
         self.assertNotEqual(response.context.get('group'), self.post.group)

@@ -1,7 +1,7 @@
-from django.test import TestCase, Client
-from django.urls import reverse
-
 from http import HTTPStatus
+
+from django.test import Client, TestCase
+from django.urls import reverse
 
 
 class StaticPagesURLTests(TestCase):
@@ -9,6 +9,7 @@ class StaticPagesURLTests(TestCase):
         self.guest_client = Client()
 
     def test_url_exists_at_desired_location(self):
+        """Проверяет доступность URL-адреса."""
         adresses_status_codes = {
             '/about/author/': HTTPStatus.OK,
             '/about/tech/': HTTPStatus.OK,
@@ -19,6 +20,7 @@ class StaticPagesURLTests(TestCase):
                 self.assertEqual(response.status_code, status_code)
 
     def test_urls_uses_correct_template(self):
+        """Проверяет, что URL-адрес использует соответствующий шаблон."""
         templates_url_names = {
             'about/author.html': '/about/author/',
             'about/tech.html': '/about/tech/',
@@ -29,6 +31,7 @@ class StaticPagesURLTests(TestCase):
                 self.assertTemplateUsed(response, template)
 
     def test_pages_uses_correct_template(self):
+        """Проверяет, что view-класс использует соответствующий шаблон."""
         templates_pages_names = {
             'about/author.html': reverse('about:author'),
             'about/tech.html': reverse('about:tech'),

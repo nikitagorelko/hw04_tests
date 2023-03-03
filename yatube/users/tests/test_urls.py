@@ -1,7 +1,7 @@
-from django.contrib.auth import get_user_model
-from django.test import TestCase, Client
-
 from http import HTTPStatus
+
+from django.contrib.auth import get_user_model
+from django.test import Client, TestCase
 
 User = get_user_model()
 
@@ -14,6 +14,7 @@ class UsersUrlTest(TestCase):
         self.authorized_client.force_login(self.user)
 
     def test_url_exists_at_desired_location(self):
+        """Проверяет доступность URL-адреса."""
         adresses_status_codes = {
             '/auth/signup/': HTTPStatus.OK,
             '/auth/login/': HTTPStatus.OK,
@@ -30,9 +31,14 @@ class UsersUrlTest(TestCase):
                 self.assertEqual(response.status_code, status_code)
 
     def test_url_redirect_anonymous(self):
+        """Проверяет, что страница по URL-адресу перенаправит анонимного
+        пользователя на страницу логина.
+        """
         adresses_redirrect = {
-            '/auth/password_change/': '/auth/login/?next=/auth/password_change/',
-            '/auth/password_change/done/': '/auth/login/?next=/auth/password_change/done/',
+            '/auth/password_change/':
+                '/auth/login/?next=/auth/password_change/',
+            '/auth/password_change/done/':
+                '/auth/login/?next=/auth/password_change/done/',
         }
         for adress, redirrect in adresses_redirrect.items():
             with self.subTest(adress=adress):
@@ -40,6 +46,7 @@ class UsersUrlTest(TestCase):
                 self.assertRedirects(response, redirrect)
 
     def test_urls_uses_correct_template(self):
+        """Проверяет, что URL-адрес использует соответствующий шаблон."""
         templates_url_names = {
             'users/signup.html': '/auth/signup/',
             'users/login.html': '/auth/login/',
