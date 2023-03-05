@@ -14,12 +14,12 @@ fake = Faker()
 class PostFormTests(TestCase):
     @classmethod
     @wrap_testdata
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         cls.user = mixer.blend(User, username='auth')
         cls.authorized_client = Client()
         cls.authorized_client.force_login(cls.user)
 
-    def test_create_post(self):
+    def test_create_post(self) -> None:
         """Проверяет, что валидная форма создает запись в Posts."""
         data = {
             'text': fake.pystr(),
@@ -29,7 +29,7 @@ class PostFormTests(TestCase):
         )
         self.assertEqual(Post.objects.count(), 1)
 
-    def test_edit_post(self):
+    def test_edit_post(self) -> None:
         """Проверяет, что при отправке валидной формы
         со страницы редактирования поста,
         происходит изменение поста в базе данных."""
@@ -48,7 +48,7 @@ class PostFormTests(TestCase):
             Post.objects.get(author=self.user).group.id, data.get('group')
         )
 
-    def test_anonym_create_post(self):
+    def test_anonym_create_post(self) -> None:
         """Проверяет, что анонимный пользователь не создает запись в Posts."""
         data = {
             'text': fake.pystr(),
@@ -56,7 +56,7 @@ class PostFormTests(TestCase):
         self.client.post(reverse('posts:post_create'), data=data, follow=True)
         self.assertEqual(Post.objects.count(), 0)
 
-    def test_anonym_edit_post(self):
+    def test_anonym_edit_post(self) -> None:
         """Проверяет, что анонимный пользователь
         не может редактировать пост."""
         groups = mixer.cycle(2).blend(Group)
@@ -74,7 +74,7 @@ class PostFormTests(TestCase):
             Post.objects.get(author=self.user).group.id, data.get('group')
         )
 
-    def test_not_auhtor_edit_post(self):
+    def test_not_auhtor_edit_post(self) -> None:
         """Проверяет, что пользователь, не являющийся автором,
         не может редактировать пост."""
         user = mixer.blend(User, username='auth1')

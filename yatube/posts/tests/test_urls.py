@@ -15,7 +15,7 @@ User = get_user_model()
 class PostUrlTest(TestCase):
     @classmethod
     @wrap_testdata
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         cls.user = mixer.blend(User, username='auth')
         cls.group = mixer.blend(Group)
         cls.post = mixer.blend(Post, author=cls.user, group=cls.group)
@@ -39,7 +39,7 @@ class PostUrlTest(TestCase):
             'missing': '/missing/',
         }
 
-    def test_http_statuses(self):
+    def test_http_statuses(self) -> None:
         """Проверяет доступность URL-адреса."""
         httpstatuses = (
             (self.urls.get('post_create'), HTTPStatus.FOUND, self.client),

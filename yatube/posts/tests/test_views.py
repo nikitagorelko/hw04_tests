@@ -100,7 +100,7 @@ class PostUrlTest(TestCase):
         expected = Post.objects.get(id=self.post.id)
         self.assertEqual(response.context.get('post'), expected)
 
-    def test_post_create_page_show_correct_context(self):
+    def test_post_create_page_show_correct_context(self) -> None:
         """Проверяет, что шаблон post_create сформирован
         с правильным контекстом."""
         response = self.authorized_client.get(reverse('posts:post_create'))
