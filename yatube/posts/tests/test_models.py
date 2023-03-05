@@ -1,5 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from mixer.backend.django import mixer
+from testdata import wrap_testdata
 
 from ..models import Group, Post
 
@@ -8,24 +10,18 @@ User = get_user_model()
 
 class PostModelTest(TestCase):
     @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.user = User.objects.create_user(username='auth')
-        cls.group = Group.objects.create(
-            title='Тестовая группа',
-            slug='Тестовый слаг',
-            description='Тестовое описание',
-        )
-        cls.post = Post.objects.create(
-            author=cls.user,
-            text='Тестовый пост',
-        )
+    @wrap_testdata
+    def setUpTestData(cls) -> None:
+        cls.user = mixer.blend(User, username='auth')
+        cls.group = mixer.blend(Group)
+        cls.post = mixer.blend(Post, author=cls.user)
 
-    def test_models_have_correct_object_names(self):
-        """Проверяем, что у моделей корректно работает __str__."""
-        group = PostModelTest.group
-        expected_group_title = group.title
-        self.assertEqual(expected_group_title, str(group))
-        post = PostModelTest.post
-        expected_post_text = post.text
-        self.assertEqual(expected_post_text, str(post)[:15])
+    def test_group_model_have_correct_string_representation(self) -> None:
+        """Проверяет, правильно ли отображается значение поля __str__
+        в объектах модели Group"""
+        self.assertEqual(self.group.title, str(self.group))
+
+    def test_post_model_have_correct_string_representation(self) -> None:
+        """Проверяет, правильно ли отображается значение поля __str__
+        в объектах модели Group"""
+        self.assertEqual(self.post.text[:15], str(self.post))

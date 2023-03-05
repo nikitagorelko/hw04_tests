@@ -1,54 +1,96 @@
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
+from faker import Faker
+from mixer.backend.django import mixer
+from testdata import wrap_testdata
 
-from ..forms import PostForm
-from ..models import Post
+from ..models import Group, Post
 
 User = get_user_model()
+fake = Faker()
 
 
 class PostFormTests(TestCase):
     @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.user = User.objects.create_user(username='auth')
-        cls.post = Post.objects.create(
-            author=cls.user,
-            text='Тестовый пост',
-        )
-        cls.form = PostForm()
-
-    def setUp(self):
-        self.guest_client = Client()
-        self.authorized_client = Client()
-        self.authorized_client.force_login(self.user)
+    @wrap_testdata
+    def setUpTestData(cls):
+        cls.user = mixer.blend(User, username='auth')
+        cls.authorized_client = Client()
+        cls.authorized_client.force_login(cls.user)
 
     def test_create_post(self):
-        """Проверят, что валидная форма создает запись в Posts."""
-        post_count = Post.objects.count()
-        form_data = {
-            'author': self.user,
-            'text': 'Тестовый текст',
+        """Проверяет, что валидная форма создает запись в Posts."""
+        data = {
+            'text': fake.pystr(),
         }
         self.authorized_client.post(
-            reverse('posts:post_create'), data=form_data, follow=True
+            reverse('posts:post_create'), data=data, follow=True
         )
-        self.assertEqual(Post.objects.count(), post_count + 1)
+        self.assertEqual(Post.objects.count(), 1)
 
     def test_edit_post(self):
-        """Проверят, что при отправке валидной формы
+        """Проверяет, что при отправке валидной формы
         со страницы редактирования поста,
         происходит изменение поста в базе данных."""
-        form_data = {
-            'author': self.user,
-            'text': 'Проверка редактирования',
-        }
+        groups = mixer.cycle(2).blend(Group)
+        post = mixer.blend(Post, author=self.user, group=groups[0])
+        data = {'text': fake.pystr(), 'group': groups[1].id}
         self.authorized_client.post(
-            reverse('posts:post_edit', kwargs={'post_id': self.post.id}),
-            data=form_data,
+            reverse('posts:post_edit', kwargs={'post_id': post.id}),
+            data=data,
             follow=True,
         )
         self.assertEqual(
-            Post.objects.get(author=self.user).text, form_data.get('text')
+            Post.objects.get(author=self.user).text, data.get('text')
+        )
+        self.assertEqual(
+            Post.objects.get(author=self.user).group.id, data.get('group')
+        )
+
+    def test_anonym_create_post(self):
+        """Проверяет, что анонимный пользователь не создает запись в Posts."""
+        data = {
+            'text': fake.pystr(),
+        }
+        self.client.post(reverse('posts:post_create'), data=data, follow=True)
+        self.assertEqual(Post.objects.count(), 0)
+
+    def test_anonym_edit_post(self):
+        """Проверяет, что анонимный пользователь
+        не может редактировать пост."""
+        groups = mixer.cycle(2).blend(Group)
+        post = mixer.blend(Post, author=self.user, group=groups[0])
+        data = {'text': fake.pystr(), 'group': groups[1].id}
+        self.client.post(
+            reverse('posts:post_edit', kwargs={'post_id': post.id}),
+            data=data,
+            follow=True,
+        )
+        self.assertNotEqual(
+            Post.objects.get(author=self.user).text, data.get('text')
+        )
+        self.assertNotEqual(
+            Post.objects.get(author=self.user).group.id, data.get('group')
+        )
+
+    def test_not_auhtor_edit_post(self):
+        """Проверяет, что пользователь, не являющийся автором,
+        не может редактировать пост."""
+        user = mixer.blend(User, username='auth1')
+        new_authorized_client = Client()
+        new_authorized_client.force_login(user)
+        groups = mixer.cycle(2).blend(Group)
+        post = mixer.blend(Post, author=self.user, group=groups[0])
+        data = {'text': fake.pystr(), 'group': groups[1].id}
+        new_authorized_client.post(
+            reverse('posts:post_edit', kwargs={'post_id': post.id}),
+            data=data,
+            follow=True,
+        )
+        self.assertNotEqual(
+            Post.objects.get(author=self.user).text, data.get('text')
+        )
+        self.assertNotEqual(
+            Post.objects.get(author=self.user).group.id, data.get('group')
         )

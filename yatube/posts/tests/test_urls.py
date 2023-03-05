@@ -1,7 +1,11 @@
 from http import HTTPStatus
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.views import redirect_to_login
 from django.test import Client, TestCase
+from django.urls import reverse
+from mixer.backend.django import mixer
+from testdata import wrap_testdata
 
 from ..models import Group, Post
 
@@ -10,64 +14,121 @@ User = get_user_model()
 
 class PostUrlTest(TestCase):
     @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.user = User.objects.create_user(username='auth')
-        cls.group = Group.objects.create(
-            title='Тестовая группа',
-            slug='test-slug',
-            description='Тестовое описание',
-        )
-        cls.post = Post.objects.create(
-            author=cls.user,
-            text='Тестовый пост',
-        )
-
-    def setUp(self):
-        self.guest_client = Client()
-        self.authorized_client = Client()
-        self.authorized_client.force_login(self.user)
-
-    def test_url_exists_at_desired_location(self):
-        """Проверяет доступность URL-адреса."""
-        adresses_status_codes = {
-            '/': HTTPStatus.OK,
-            f'/group/{self.group.slug}/': HTTPStatus.OK,
-            f'/profile/{self.user.username}/': HTTPStatus.OK,
-            f'/posts/{self.post.id}/': HTTPStatus.OK,
-            '/create/': HTTPStatus.OK,
-            f'/posts/{self.post.id}/edit/': HTTPStatus.OK,
-            '/unexisting_page/': HTTPStatus.NOT_FOUND,
+    @wrap_testdata
+    def setUpTestData(cls):
+        cls.user = mixer.blend(User, username='auth')
+        cls.group = mixer.blend(Group)
+        cls.post = mixer.blend(Post, author=cls.user, group=cls.group)
+        cls.authorized_client = Client()
+        cls.authorized_client.force_login(cls.user)
+        cls.urls = {
+            'post_create': reverse('posts:post_create'),
+            'group_list': reverse(
+                'posts:group_list', kwargs={'slug': cls.group.slug}
+            ),
+            'index': reverse('posts:index'),
+            'post_detail': reverse(
+                'posts:post_detail', kwargs={'post_id': cls.post.id}
+            ),
+            'post_edit': reverse(
+                'posts:post_edit', kwargs={'post_id': cls.post.id}
+            ),
+            'profile': reverse(
+                'posts:profile', kwargs={'username': cls.user.username}
+            ),
+            'missing': '/missing/',
         }
-        for adress, status_code in adresses_status_codes.items():
-            with self.subTest(adress=adress):
-                response = self.authorized_client.get(adress)
-                self.assertEqual(response.status_code, status_code)
 
-    def test_url_redirect_anonymous(self):
+    def test_http_statuses(self):
+        """Проверяет доступность URL-адреса."""
+        httpstatuses = (
+            (self.urls.get('post_create'), HTTPStatus.FOUND, self.client),
+            (
+                self.urls.get('post_create'),
+                HTTPStatus.OK,
+                self.authorized_client,
+            ),
+            (self.urls.get('group_list'), HTTPStatus.OK, self.client),
+            (self.urls.get('index'), HTTPStatus.OK, self.client),
+            (self.urls.get('post_detail'), HTTPStatus.OK, self.client),
+            (self.urls.get('post_edit'), HTTPStatus.FOUND, self.client),
+            (
+                self.urls.get('post_edit'),
+                HTTPStatus.OK,
+                self.authorized_client,
+            ),
+            (self.urls.get('profile'), HTTPStatus.OK, self.client),
+            (self.urls.get('missing'), HTTPStatus.NOT_FOUND, self.client),
+        )
+        for status in httpstatuses:
+            with self.subTest(status=status):
+                self.assertEqual(
+                    status[2].get(status[0]).status_code, status[1]
+                )
+
+    def test_templates(self) -> None:
+        """Проверяет, что URL-адрес использует соответствующий шаблон."""
+        templates = (
+            (
+                self.urls.get('post_create'),
+                'posts/create_post.html',
+                self.authorized_client,
+            ),
+            (
+                self.urls.get('group_list'),
+                'posts/group_list.html',
+                self.client,
+            ),
+            (self.urls.get('index'), 'posts/index.html', self.client),
+            (
+                self.urls.get('post_detail'),
+                'posts/post_detail.html',
+                self.client,
+            ),
+            (
+                self.urls.get('post_edit'),
+                'posts/create_post.html',
+                self.authorized_client,
+            ),
+            (self.urls.get('profile'), 'posts/profile.html', self.client),
+        )
+        for template in templates:
+            with self.subTest(template=template):
+                self.assertTemplateUsed(
+                    template[2].get(template[0]), template[1]
+                )
+
+    def test_redirects(self) -> None:
         """Проверяет, что страница по URL-адресу перенаправит анонимного
         пользователя на страницу логина."""
-        adresses_redirrect = {
-            '/create/': '/auth/login/?next=/create/',
-            f'/posts/{self.post.id}/edit/':
-                f'/auth/login/?next=/posts/{self.post.id}/edit/',
-        }
-        for adress, redirrect in adresses_redirrect.items():
-            with self.subTest(adress=adress):
-                response = self.guest_client.get(adress, follow=True)
-                self.assertRedirects(response, redirrect)
-
-    def test_urls_uses_correct_template(self):
-        """Проверяет, что URL-адрес использует соответствующий шаблон."""
-        url_names_templates = {
-            '/': 'posts/index.html',
-            f'/group/{self.group.slug}/': 'posts/group_list.html',
-            f'/profile/{self.user.username}/': 'posts/profile.html',
-            f'/posts/{self.post.id}/': 'posts/post_detail.html',
-            '/create/': 'posts/create_post.html',
-            f'/posts/{self.post.id}/edit/': 'posts/create_post.html',
-        }
-        for address, template in url_names_templates.items():
-            with self.subTest(address=address):
-                response = self.authorized_client.get(address)
-                self.assertTemplateUsed(response, template)
+        user = mixer.blend(User, username='auth1')
+        new_authorized_client = Client()
+        new_authorized_client.force_login(user)
+        redirects = (
+            (
+                self.urls.get('post_create'),
+                redirect_to_login(
+                    reverse('posts:post_create'),
+                    login_url=reverse('users:login'),
+                ).url,
+                self.client,
+            ),
+            (
+                self.urls.get('post_edit'),
+                redirect_to_login(
+                    reverse(
+                        'posts:post_edit', kwargs={'post_id': self.post.id}
+                    ),
+                    login_url=reverse('users:login'),
+                ).url,
+                self.client,
+            ),
+            (
+                self.urls.get('post_edit'),
+                reverse('posts:post_detail', kwargs={'post_id': self.post.id}),
+                new_authorized_client,
+            ),
+        )
+        for redirect in redirects:
+            with self.subTest(redirect=redirect):
+                self.assertRedirects(redirect[2].get(redirect[0]), redirect[1])

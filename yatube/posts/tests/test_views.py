@@ -2,6 +2,8 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
+from mixer.backend.django import mixer
+from testdata import wrap_testdata
 from yatube.settings import NOTES_NUMBER
 
 from ..models import Group, Post
@@ -11,26 +13,15 @@ User = get_user_model()
 
 class PostUrlTest(TestCase):
     @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.user = User.objects.create_user(username='auth')
-        cls.group = Group.objects.create(
-            title='Тестовая группа',
-            slug='test-slug',
-            description='Тестовое описание',
-        )
-        cls.post = Post.objects.create(
-            author=cls.user,
-            text='Тестовый пост',
-            group=cls.group,
-        )
+    @wrap_testdata
+    def setUpTestData(cls) -> None:
+        cls.user = mixer.blend(User, username='auth')
+        cls.group = mixer.blend(Group)
+        cls.post = mixer.blend(Post, author=cls.user, group=cls.group)
+        cls.authorized_client = Client()
+        cls.authorized_client.force_login(cls.user)
 
-    def setUp(self):
-        self.guest_client = Client()
-        self.authorized_client = Client()
-        self.authorized_client.force_login(self.user)
-
-    def test_pages_uses_correct_template(self):
+    def test_pages_uses_correct_template(self) -> None:
         """Проверяет, что view-функция использует соответствующий шаблон."""
         pages_names_templates = {
             reverse('posts:index'): 'posts/index.html',
@@ -55,14 +46,9 @@ class PostUrlTest(TestCase):
                 response = self.authorized_client.get(reverse_name)
                 self.assertTemplateUsed(response, template)
 
-    def test_page_show_correct_recors_count(self):
+    def test_page_show_correct_recors_count(self) -> None:
         """Проверяет паджинатор на странице."""
-        for i in range(13):
-            Post.objects.create(
-                author=self.user,
-                text=f'Тестовый пост {str(i)}',
-                group=self.group,
-            )
+        mixer.cycle(13).blend(Post, author=self.user, group=self.group)
         pages = [
             reverse('posts:index'),
             reverse('posts:group_list', kwargs={'slug': self.group.slug}),
@@ -75,15 +61,15 @@ class PostUrlTest(TestCase):
                     len(response.context['page_obj']), NOTES_NUMBER
                 )
 
-    def test_index_page_show_correct_context(self):
+    def test_index_page_show_correct_context(self) -> None:
         """Проверяет, что шаблон index сформирован с правильным контекстом."""
-        response = self.guest_client.get(reverse("posts:index"))
+        response = self.client.get(reverse("posts:index"))
         expected = list(Post.objects.all()[:NOTES_NUMBER])
         self.assertEqual(
             response.context.get('page_obj').object_list, expected
         )
 
-    def test_group_list_page_show_correct_context(self):
+    def test_group_list_page_show_correct_context(self) -> None:
         """Проверяет, что шаблон group_list сформирован
         с правильным контекстом."""
         response = self.authorized_client.get(
@@ -94,7 +80,7 @@ class PostUrlTest(TestCase):
             response.context.get('page_obj').object_list, expected
         )
 
-    def test_profile_page_show_correct_context(self):
+    def test_profile_page_show_correct_context(self) -> None:
         """Проверяет, что шаблон profile сформирован
         с правильным контекстом."""
         response = self.authorized_client.get(
@@ -105,7 +91,7 @@ class PostUrlTest(TestCase):
             response.context.get('page_obj').object_list, expected
         )
 
-    def test_post_detail_page_show_correct_context(self):
+    def test_post_detail_page_show_correct_context(self) -> None:
         """Проверяет, что шаблон post_detail сформирован
         с правильным контекстом."""
         response = self.authorized_client.get(
@@ -127,7 +113,7 @@ class PostUrlTest(TestCase):
                 form_field = response.context.get('form').fields.get(value)
                 self.assertIsInstance(form_field, expected)
 
-    def test_post_edit_page_show_correct_context(self):
+    def test_post_edit_page_show_correct_context(self) -> None:
         """Проверяет, что шаблон post_edit сформирован
         с правильным контекстом."""
         response = self.authorized_client.get(
@@ -142,7 +128,7 @@ class PostUrlTest(TestCase):
                 form_field = response.context.get('form').fields.get(value)
                 self.assertIsInstance(form_field, expected)
 
-    def test_post_is_on_pages_if_has_group(self):
+    def test_post_is_on_pages_if_has_group(self) -> None:
         """Проверяет, что если при создании поста указать группу,
         то этот пост появляется на странице"""
         pages_objects = {
@@ -161,14 +147,10 @@ class PostUrlTest(TestCase):
                 response = self.authorized_client.get(page)
                 self.assertIn(object, response.context.get('page_obj'))
 
-    def test_post_is_not_on_another_group_page(self):
+    def test_post_is_not_on_another_group_page(self) -> None:
         """Проверяет, что пост не попал в группу,
         для которой не был предназначен."""
-        Group.objects.create(
-            title='Тестовая группа2',
-            slug='test-slug2',
-            description='Тестовое описание2',
-        )
+        mixer.blend(Group, slug='test-slug2')
         response = self.authorized_client.get(
             reverse('posts:group_list', kwargs={'slug': 'test-slug2'})
         )
