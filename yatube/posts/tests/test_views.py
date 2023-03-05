@@ -3,7 +3,6 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 from mixer.backend.django import mixer
-from testdata import wrap_testdata
 from yatube.settings import NOTES_NUMBER
 
 from ..models import Group, Post
@@ -13,7 +12,6 @@ User = get_user_model()
 
 class PostUrlTest(TestCase):
     @classmethod
-    @wrap_testdata
     def setUpTestData(cls) -> None:
         cls.user = mixer.blend(User, username='auth')
         cls.group = mixer.blend(Group)

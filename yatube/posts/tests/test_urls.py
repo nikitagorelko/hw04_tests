@@ -5,7 +5,6 @@ from django.contrib.auth.views import redirect_to_login
 from django.test import Client, TestCase
 from django.urls import reverse
 from mixer.backend.django import mixer
-from testdata import wrap_testdata
 
 from ..models import Group, Post
 
@@ -14,7 +13,6 @@ User = get_user_model()
 
 class PostUrlTest(TestCase):
     @classmethod
-    @wrap_testdata
     def setUpTestData(cls) -> None:
         cls.user = mixer.blend(User, username='auth')
         cls.group = mixer.blend(Group)

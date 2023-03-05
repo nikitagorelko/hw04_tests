@@ -3,7 +3,6 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from faker import Faker
 from mixer.backend.django import mixer
-from testdata import wrap_testdata
 
 from ..models import Group, Post
 
@@ -13,7 +12,6 @@ fake = Faker()
 
 class PostFormTests(TestCase):
     @classmethod
-    @wrap_testdata
     def setUpTestData(cls) -> None:
         cls.user = mixer.blend(User, username='auth')
         cls.authorized_client = Client()
